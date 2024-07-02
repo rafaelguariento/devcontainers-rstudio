@@ -41,6 +41,12 @@ library(MuMIn)
 ###A null model (no effect of landscape-scale variables or human population)
 m1<-glmer(scorpion~1 + (1|ID),data=envir,family=poisson)
 
+#install.packages("gratia")
+library(gratia)
+
+appraise(m1)& #gam check
+  theme_bw()
+
 ###Biodiversity is influenced by landscape-scale variables
 m2<-glmer(scorpion~cover_loss + (1|ID), data=envir,family=poisson)
 m3<-glmer(scorpion~fire + (1|ID), data=envir,family=poisson)
@@ -63,6 +69,8 @@ check_overdispersion(m8)###overdispersion detected
 
 ###A null model (no effect of landscape-scale variables or human population)
 m1<-glmer.nb(scorpion~1 + (1|ID),data=envir)
+appraise(m1)& #gam check
+  theme_bw()
 
 ###Biodiversity is influenced by landscape-scale variables
 m2<-glmer.nb(scorpion~cover_loss + (1|ID), data=envir)
@@ -420,3 +428,17 @@ summary(m1$gam)
 res1 <- resid(m1, type="pearson")
 overdispersion_sco <- sum(res1^2)/m1$gam$df.residual
 overdispersion_sco # 0 = no problem with overdispersion
+
+
+
+
+## lme
+
+m1<-glmer.nb(bee~cover_loss + fire + urbanization + (1|ID), data=envir)
+tab_model(m1)
+summary(m1)
+
+
+library(nlme)
+model <- lme(bee ~ cover_loss + fire + urbanization, random = ~ ID, data=envir,  corAR1(0, form = ~year))
+
