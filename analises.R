@@ -460,6 +460,20 @@ m1g <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir
 
 m1h <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corSpher(form = ~ year|ID))
 
+# Compare models using AIC
+AIC_values <- AIC(m1a, m1b, m1c, m1d, m1e, m1f, m1g, m1h)
+
+delta_AIC <- AIC_values - min(AIC_values)
+
+AIC_weights <- exp(-0.5 * delta_AIC) / sum(exp(-0.5 * delta_AIC))
+
+# Compare models using ANOVA
+anova_results <- anova(m1a, m1b, m1c, m1d, m1e, m1f, m1g, m1h)
+
+# Print the AIC values, AIC weights, and ANOVA results
+print(AIC_values)
+print(AIC_weights)
+print(anova_results)
 
 plot(m1e)
 
