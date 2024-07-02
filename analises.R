@@ -13,13 +13,11 @@ col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA")
 corrplot(M, method="color", col=col(200), addCoef.col = "black", type="upper", 
          order="hclust",diag=FALSE)
 
-#install.packages("GGally")
 library(GGally)
 pm <- ggpairs(envir[,c(3:6)])
 pm
 
 ###Choice of variables for model selection###
-#install.packages("usdm")
 library(usdm)
 vifstep(envir[,c(3:6)])
 
@@ -29,9 +27,14 @@ sapply(envir, is.numeric)
 cols_to_scale <- setdiff(names(envir), c('bee', 'caterpillar', 'scorpion', 'snake', 'spider','ID','year'))
 envir[cols_to_scale] <- scale(envir[cols_to_scale])
 
+tools::package_dependencies("Matrix", which = "LinkingTo", reverse = TRUE)[[1L]]
+install.packages("lme4", type = "source")
 
-#install.packages("lme4")
-#install.packages("MuMIn")
+oo <- options(repos = "https://cran.r-project.org/")
+utils::install.packages("Matrix")
+utils::install.packages("lme4")
+options(oo)
+
 library(lme4)
 library(MuMIn)
 
@@ -40,12 +43,6 @@ library(MuMIn)
 
 ###A null model (no effect of landscape-scale variables or human population)
 m1<-glmer(scorpion~1 + (1|ID),data=envir,family=poisson)
-
-#install.packages("gratia")
-library(gratia)
-
-appraise(m1)& #gam check
-  theme_bw()
 
 ###Biodiversity is influenced by landscape-scale variables
 m2<-glmer(scorpion~cover_loss + (1|ID), data=envir,family=poisson)
@@ -69,8 +66,6 @@ check_overdispersion(m8)###overdispersion detected
 
 ###A null model (no effect of landscape-scale variables or human population)
 m1<-glmer.nb(scorpion~1 + (1|ID),data=envir)
-appraise(m1)& #gam check
-  theme_bw()
 
 ###Biodiversity is influenced by landscape-scale variables
 m2<-glmer.nb(scorpion~cover_loss + (1|ID), data=envir)
@@ -354,14 +349,17 @@ summary(m1)
 ###########Scorpion#################
 
 library(mgcv)
-
-#install.packages("DHARMa")
 library(DHARMa)
+library(gratia)
+library(ggplot2)
 
 m1 <- mgcv::gamm(scorpion ~ s(cover_loss)+s(fire)+s(urbanization), 
                    correlation = corARMA(form = ~ 1| year, p=1), family = poisson, niterPQL=30, data=envir)
 
 summary(m1$gam)##não dá os coeficientes para cada variável
+
+appraise(m1$gam)& #gam check
+  theme_bw()
 
 ####Checking for overdispersion
 
@@ -369,8 +367,11 @@ res1 <- resid(m1, type="pearson")
 overdispersion_sco <- sum(res1^2)/m1$gam$df.residual
 overdispersion_sco # 0 = no problem with overdispersion
 
-simulationOutput1 <-DHARMa::simulateResiduals(m1$gam)
-DHARMa::testDispersion(simulationOutput1)
+###Negative binomial
+
+m1 <- mgcv::gamm(scorpion ~ s(cover_loss)+s(fire)+s(urbanization), 
+                 correlation = corARMA(form = ~ 1| year, p=1), family = negbin(1), niterPQL=400, data=envir)
+
 
 ###########bee#################
 
@@ -378,6 +379,9 @@ m1 <- mgcv::gamm(bee ~ s(cover_loss)+s(fire)+s(urbanization),
                  correlation = corARMA(form = ~ 1| year, p=1), family = poisson, niterPQL=30, data=envir)
 
 summary(m1$gam)
+
+appraise(m1$gam)& #gam check
+  theme_bw()
 
 
 ####Checking for overdispersion
@@ -431,14 +435,72 @@ overdispersion_sco # 0 = no problem with overdispersion
 
 
 
+#################NLME######################
 
-## lme
-
-m1<-glmer.nb(bee~cover_loss + fire + urbanization + (1|ID), data=envir)
-tab_model(m1)
-summary(m1)
-
+###Scorpion
 
 library(nlme)
-model <- lme(bee ~ cover_loss + fire + urbanization, random = ~ ID, data=envir,  corAR1(0, form = ~year))
+library(MASS)
 
+# Compare models with same fixed effects and other correlation structure 
+
+m1a <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+
+m1b <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corARMA(form = ~ year|ID,p=1))
+
+m1c <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corCAR1(form = ~ year|ID))
+
+m1d <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corExp(form = ~ year|ID))
+
+m1e <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corGaus(form = ~ year|ID))
+
+m1f <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corLin(form = ~ year|ID))
+
+m1g <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corRatio(form = ~ year|ID))
+
+m1h <- glmmPQL(scorpion~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corSpher(form = ~ year|ID))
+
+
+plot(m1e)
+
+library(r2glmm)
+
+#r2beta Compute R Squared for Mixed Models
+#Description: Computes coefficient of determination (R squared) from edwards et al., 2008 and the generalized R squared from Jaeger et al., 2016. Currently implemented for linear mixed models with lmer and lme objects. For generalized linear mixed models, only glmmPQL are supported.
+
+r2beta(m1a, partial = TRUE, method = "sgv")
+
+r.squaredGLMM(m1a)#package MuMIn
+
+###Bee
+
+m1a <- glmmPQL(bee~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+
+plot(m1a)
+
+r.squaredGLMM(m1a)#package MuMIn
+
+###Caterpillar
+
+m1a <- glmmPQL(caterpillar~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+
+plot(m1a)
+
+r.squaredGLMM(m1a)#package MuMIn
+
+###Snake
+
+m1a <- glmmPQL(snake~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+
+plot(m1a)
+
+r.squaredGLMM(m1a)#package MuMIn
+
+
+###Spider
+
+m1a <- glmmPQL(spider~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+
+plot(m1a)
+
+r.squaredGLMM(m1a)#package MuMIn
