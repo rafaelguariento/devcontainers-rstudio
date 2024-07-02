@@ -499,8 +499,8 @@ r.squaredGLMM(m1a)#package MuMIn
 
 ###Spider
 
-m1a <- glmmPQL(spider~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corAR1(form = ~ year|ID))
+m1a <- glmmPQL(spider~cover_loss + fire + urbanization,random=~1|ID,data=envir,family=poisson, correlation=corGaus(form = ~ year|ID))
 
-plot(m1a)
+summary(m1a)
 
 r.squaredGLMM(m1a)#package MuMIn
